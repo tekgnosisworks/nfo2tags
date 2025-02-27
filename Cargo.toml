@@ -1,0 +1,23 @@
+[package]
+name = "nfo2tags"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+chrono = "0.4.39"
+clap = { version = "4.5.29", features = ["derive"] }
+env_logger = "0.11.6"
+image = "0.25.5"
+indicatif = "0.17.11"
+log = "0.4.25"
+serde = { version = "1.0.217", features = ["derive"] }
+serde-xml-rs = "0.6.0"
+walkdir = "2.5.0"
+xml = "0.8.20"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
