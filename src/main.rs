@@ -265,9 +265,14 @@ fn process_file(
                 ffmpeg_args.push(output.to_str().unwrap_or(""));
             }
 
-            let _ = run_ffmpeg_with_progress(&working_video_path.to_str().unwrap(), ffmpeg_args);
-            if deletefile {
-                let _ = fs::remove_file(&working_video_path);
+            let didcomplete = run_ffmpeg_with_progress(&working_video_path.to_str().unwrap(), ffmpeg_args);
+            match didcomplete {
+                Ok(_) => {
+                    if deletefile {
+                        let _ = fs::remove_file(&working_video_path);
+                    }
+                },
+                Err(e) => { error!("FFMpeg did not complete: {}", e)}
             }
         },
         "mkv" => {
