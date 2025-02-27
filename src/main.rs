@@ -68,6 +68,13 @@ fn main() -> io::Result<()> {
                 .value_parser(value_parser!(PathBuf))
                 .help("Sets mp4's output file, since the whole container must be rewritten to put in the tags. If missing, it just creats a backup of the file, File.OLD.mp4. ***Does not apply to MVK***"),
         )
+        .arg(
+            Arg::new("delete")
+                .short('d')
+                .long("delete")
+                .action(clap::ArgAction::SetTrue)
+                .help("Delete the OLD files after processing"),
+        )
         .get_matches();
 
     let ffmpegtest: bool = check_for_programs("ffmpeg");
@@ -85,7 +92,7 @@ fn main() -> io::Result<()> {
     let video_path: &PathBuf = matches.get_one("video")
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound,"Video File not specified"))?;
     let cover_suffix: &String = matches.get_one("cover-name").unwrap();
-
+    let deletefile = matches.get_flag("delete");
     let start_time = Instant::now();
     let mut processed_count = 0;
     let mut error_count = 0;
@@ -99,7 +106,7 @@ fn main() -> io::Result<()> {
                     let passnfo = nfo_path(path.to_path_buf(),None);
                     let passcover = cover_path(path.to_path_buf(),None,cover_suffix.to_string());
                     let passoutput = output_file_path(path.to_path_buf(),None);
-                    match process_file(path, passnfo.as_ref().map(|p|p.as_path()), passcover.as_ref().map(|p|p.as_path()),passoutput.as_ref().map(|p|p.as_path()) ) {
+                    match process_file(path, passnfo.as_ref().map(|p|p.as_path()), passcover.as_ref().map(|p|p.as_path()),passoutput.as_ref().map(|p|p.as_path()),deletefile ) {
                         Ok(_) => {
                             processed_count += 1;
                             info!("Success: {}", path.display());
@@ -118,7 +125,7 @@ fn main() -> io::Result<()> {
         let passnfo = nfo_path(video_path.to_path_buf(),matches.get_one("nfo"));
         let passcover = cover_path(video_path.to_path_buf(),matches.get_one("cover"),coversuffix.to_string());
         let passoutput = output_file_path(video_path.to_path_buf(),matches.get_one("output"));
-        match process_file(video_path, passnfo.as_ref().map(|p|p.as_path()), passcover.as_ref().map(|p|p.as_path()),passoutput.as_ref().map(|p|p.as_path()) ) {
+        match process_file(video_path, passnfo.as_ref().map(|p|p.as_path()), passcover.as_ref().map(|p|p.as_path()),passoutput.as_ref().map(|p|p.as_path()),deletefile ) {
             Ok(_) => {
                 info!("Success: {}", passoutput.unwrap().display());
                 processed_count += 1;
@@ -143,7 +150,8 @@ fn process_file(
     video_path: &Path,
     nfo_path: Option<&Path>,
     cover_path: Option<&Path>,
-    output_path: Option<&Path>
+    output_path: Option<&Path>,
+    deletefile: bool
 ) -> io::Result<()> {
     let mut use_nfo = true;
     let mut nfo: Option<Nfo> = None;
@@ -258,6 +266,9 @@ fn process_file(
             }
 
             let _ = run_ffmpeg_with_progress(&working_video_path.to_str().unwrap(), ffmpeg_args);
+            if deletefile {
+                let _ = fs::remove_file(&working_video_path);
+            }
         },
         "mkv" => {
             if let Some(nfo_path) = nfo_path {
