@@ -2,6 +2,8 @@
 
 I wanted to get the data from my tinymediamanager generated NFO files into the files. I also wanted the poster to be put in the file. **This will clear your existing tags from the file**
 
+**IMPORTANT** You must have ffmpeg(https://www.ffmpeg.org/) and mkvpropedit(https://mkvtoolnix.download/) installed and part of path for this to work.
+
 ## Arguments
 
 **-v** or **--video** Sets the video file or the folder where the video files are found.\
