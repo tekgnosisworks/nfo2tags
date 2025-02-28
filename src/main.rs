@@ -24,7 +24,7 @@ fn main() -> io::Result<()> {
     info!("Starting NFO2tags application");
 
     let matches = Command::new("NFO2tags")
-        .version("1.0")
+        .version("1.0.1")
         .author("William Moore <bmoore@tekgnosis.works>")
         .about("Adds NFO information to the metadata in MP4 or MKV files.")
         .arg(
