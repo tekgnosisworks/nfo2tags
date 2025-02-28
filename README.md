@@ -1,8 +1,13 @@
 # nfo2tags
 
-I wanted to get the data from my tinymediamanager generated NFO files into the files. I also wanted the poster to be put in the file. **This will clear your existing tags from the file**
+I wanted to get the data from my tinymediamanager generated NFO files into the files. I also wanted the poster to be put in the file for thumbnailing. **NOTE: This will clear your existing tags from the file**
 
 **IMPORTANT** You must have ffmpeg(https://www.ffmpeg.org/) and mkvpropedit(https://mkvtoolnix.download/) installed and part of path for this to work.
+
+## Tags
+This are limited by the standards and implementations of the containers.
+**MP4:** Title, Genre, Keywords, Description, Synopsis, Premiered(date)\
+**MKV:** Actors, Directors, Credits, Description, Summary, Collection Name, COllection Overview, Plot, Outline, Overview, Tags, Genre, id (imdb), Title, OriginalTitle, Year, Tagline, Runtime, MPAA, Certification, tmdbid, Country, Premiered (date), Studio
 
 ## Arguments
 
