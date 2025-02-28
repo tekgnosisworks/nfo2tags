@@ -5,7 +5,7 @@ I wanted to get the data from my tinymediamanager generated NFO files into the f
 **IMPORTANT** You must have ffmpeg(https://www.ffmpeg.org/) and mkvpropedit(https://mkvtoolnix.download/) installed and part of path for this to work.
 
 ## Tags
-This are limited by the standards and implementations of the containers.
+This are limited by the standards and implementations of the containers.\
 **MP4:** Title, Genre, Keywords, Description, Synopsis, Premiered(date)\
 **MKV:** Actors, Directors, Credits, Description, Summary, Collection Name, COllection Overview, Plot, Outline, Overview, Tags, Genre, id (imdb), Title, OriginalTitle, Year, Tagline, Runtime, MPAA, Certification, tmdbid, Country, Premiered (date), Studio
 
