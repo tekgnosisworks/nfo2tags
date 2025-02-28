@@ -2,6 +2,7 @@
 
 I wanted to get some of the data from my tinymediamanager generated NFO files into the files. I also wanted the poster to be put in the file for thumbnailing. I also wanted all the old "tags" to be removed so **NOTE: This will clear your existing tags from the file**
 
+This only works on MP4 and MKV containers.
 **IMPORTANT** You must have ffmpeg(https://www.ffmpeg.org/) and mkvpropedit(https://mkvtoolnix.download/) installed and part of path for this to work.
 
 ## Tags
@@ -9,7 +10,7 @@ These are limited by the standards and implementations of the containers.
 
 **MP4:** Title, Genre, Keywords, Description, Synopsis, Premiered(date)
 
-**MKV:** Actors, Directors, Credits, Description, Summary, Collection Name, COllection Overview, Plot, Outline, Overview, Tags, Genre, id (imdb), Title, OriginalTitle, Year, Tagline, Runtime, MPAA, Certification, tmdbid, Country, Premiered (date), Studio
+**MKV:** Actors, Directors, Credits, Description, Summary, Collection Name, Collection Overview, Plot, Outline, Overview, Tags, Genre, id (imdb), Title, OriginalTitle, Year, Tagline, Runtime, MPAA, Certification, tmdbid, Country, Premiered (date), Studio
 
 ## Arguments
 
