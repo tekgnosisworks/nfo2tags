@@ -23,6 +23,6 @@ When using with a folder, it handles each file as it comes accross it. Now you m
 
 ## Free
 
-I am starting my IT company backup. I am trying to raise some funds. If you like the software, please contribute.
-Zelle bmoore@tekgnosis.works
-venmo @tekgnosis
+I am starting my IT company backup. I am trying to raise some funds. If you like the software, please contribute.\
+Zelle bmoore@tekgnosis.works\
+venmo @tekgnosis\
