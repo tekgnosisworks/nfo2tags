@@ -556,11 +556,15 @@ fn check_for_programs(program_name: &str) -> bool{
 #[derive(Debug, Deserialize)]
 struct Nfo {
     title: String,
+    #[serde(default)]
     premiered: String,
+    #[serde(default)]
     outline: String,
+    #[serde(default)]
     plot: String,
+    #[serde(default)]
     genre: Vec<Genre>,
-    #[serde(rename = "tag")]
+    #[serde(rename = "tag", default)]
     tags: Vec<Tag>
 }
 
