@@ -14,7 +14,7 @@ These are limited by the standards and implementations of the containers.
 ## Arguments
 
 **-v** or **--video** Sets the video file or the folder where the video files are found.\
-**-n** or ** --nfo** Sets the .nfo file. This only applys to single file use. In folder mode it looks for .nfo files with the same name as the movie.\
+**-n** or **--nfo** Sets the .nfo file. This only applys to single file use. In folder mode it looks for .nfo files with the same name as the movie.\
 **-c** or **--cover** Sets the cover file, either jpg or png. If using folder mode, this does not work. It will use the video file name + texted passed in to -N or --cover-name. Default is '-poster'.\
 **-N** or **--cover-name** This is a custom suffix for the cover file. It will be added to the video file name to identify the image you want to use.\
 **-o** or **--output** Sets mp4's output file, since the whole container must be rewritten to put in the tags. If missing, it just creats a backup of the file, File.OLD.mp4. ***Does not apply to MVK***
