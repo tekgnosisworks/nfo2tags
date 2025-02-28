@@ -19,6 +19,8 @@ It acts different for each file type. MKV files can be edited directly. However,
 
 When using with a folder, it handles each file as it comes accross it. Now you must be careful, since mp4 must duplicate, you must make sure there is space to do this.
 
+**Logging** It posts the log in the terminal and to nfo2tags.log file adjacent to executable.
+
 ## Free
 
 I am starting my IT company backup. I am trying to raise some funds. If you like the software, please contribute.
