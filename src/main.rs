@@ -306,8 +306,16 @@ fn process_file(
                 .args(&[video_path.to_str().unwrap_or(""), "--delete-attachment", "mime-type:image/png"]);
             stdCommand::new("mkvpropedit")
                 .args(&[video_path.to_str().unwrap_or(""), "--tags", "all:"]);
-
-            stdCommand::new("mkvpropedit").args(&mkvpropedit_args);
+            
+            let runthis = stdCommand::new("mkvpropedit").args(&mkvpropedit_args).output();
+            match runthis {
+                Ok(_) => {
+                    info!("File Taged")
+                },
+                Err(e) => {
+                    error!("mkvpropedit error: {}",e)
+                }
+            }
             let _ = fs::remove_file(output_xml_path);
         },
         _ => error!("{} Incorrect file type. It only works with MP4 and MKV files.", file_ext),
