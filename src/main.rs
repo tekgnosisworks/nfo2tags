@@ -20,11 +20,10 @@ fn main() -> io::Result<()> {
     if let Err(e) = setup_logger() {
         eprintln!("Failed to setup logger: {}", e);
     }
-    
     info!("Starting NFO2tags application");
 
     let matches = Command::new("NFO2tags")
-        .version("1.0.1")
+        .version("1.0.2")
         .author("William Moore <bmoore@tekgnosis.works>")
         .about("Adds NFO information to the metadata in MP4 or MKV files.")
         .arg(
@@ -306,11 +305,9 @@ fn process_file(
                 .args(&[video_path.to_str().unwrap_or(""), "--delete-attachment", "mime-type:image/png"]);
             stdCommand::new("mkvpropedit")
                 .args(&[video_path.to_str().unwrap_or(""), "--tags", "all:"]);
-            
             let runthis = stdCommand::new("mkvpropedit").args(&mkvpropedit_args).output();
             match runthis {
                 Ok(_) => {
-                    info!("File Taged")
                 },
                 Err(e) => {
                     error!("mkvpropedit error: {}",e)
@@ -325,16 +322,10 @@ fn process_file(
 }
 
 fn run_ffmpeg_with_progress(input_file: &str, mut video_args: Vec<&str>) -> Result<(), Box<dyn std::error::Error>> {
-    let input_index = video_args.iter().position(|&x| x == input_file).unwrap_or(0);
-    video_args.insert(input_index + 1, "-progress");
-    video_args.insert(input_index + 2, "pipe:1");
-
-    let mut cmd = stdCommand::new("ffmpeg")
-        .args(&video_args)
-        .stderr(Stdio::piped())
-        .stdout(Stdio::piped())
-        .spawn()?;
-
+    // Keep track of whether we're getting progress updates
+    let mut received_progress = false;
+    
+    // Get the duration before starting ffmpeg
     let duration = {
         let probe = stdCommand::new("ffprobe")
             .args([
@@ -347,41 +338,80 @@ fn run_ffmpeg_with_progress(input_file: &str, mut video_args: Vec<&str>) -> Resu
         
         String::from_utf8_lossy(&probe.stdout)
             .trim()
-            .parse::<f64>()?
+            .parse::<f64>()
+            .unwrap_or(0.0)
     };
 
-    let pb = ProgressBar::new(duration as u64);
+    // Add progress output flag to FFmpeg
+    let input_index = video_args.iter().position(|&x| x == input_file).unwrap_or(0);
+    video_args.insert(input_index + 1, "-progress");
+    video_args.insert(input_index + 2, "pipe:1");
+    
+    println!("Starting to process: {}", input_file);
+
+    let pb = ProgressBar::new(100);
     pb.set_style(ProgressStyle::default_bar()
         .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {percent}% ({eta})")?
         .progress_chars("#>-"));
-
+    
+    pb.set_position(0);
+    
+    let mut cmd = stdCommand::new("ffmpeg")
+        .args(&video_args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())  
+        .spawn()?;
+    
+    let pb_clone = pb.clone();
+    let fake_updates = thread::spawn(move || {
+        for i in 1..100 {
+            thread::sleep(std::time::Duration::from_millis(100));
+            if !received_progress {
+                pb_clone.set_position(i);
+            } else {
+                break;
+            }
+        }
+    });
+    
     if let Some(stdout) = cmd.stdout.take() {
         let reader = BufReader::new(stdout);
         
-        let pb_clone = pb.clone();
-        thread::spawn(move || {
-            let mut current_time = 0_f64;
-            for line in reader.lines() {
-                if let Ok(line) = line {
-                    if line.starts_with("out_time=") {
-                        let time_str = &line[9..];
-                        if let Ok(seconds) = parse_timestamp(time_str) {
-                            current_time = seconds;
-                            pb_clone.set_position(current_time as u64);
-                        }
+        for line in reader.lines() {
+            if let Ok(line) = line {
+                if line.starts_with("out_time=") {
+                    received_progress = true;  // We've received real progress
+                    
+                    let time_str = &line[9..];
+                    if let Ok(seconds) = parse_timestamp(time_str) {
+                        let percent = if duration > 0.0 {
+                            ((seconds / duration) * 100.0) as u64
+                        } else {
+                            0
+                        };
+                        
+                        pb.set_position(percent.min(100));
                     }
                 }
             }
-        });
+        }
     }
-
+    
+    // Wait for FFmpeg to complete
     let status = cmd.wait()?;
-    pb.finish_with_message("Done!");
-
-    if !status.success() {
+    
+    // Cancel our fake updates thread
+    fake_updates.join().unwrap_or(());
+    
+    // Always show 100% when done if successful
+    if status.success() {
+        pb.set_position(100);
+        pb.finish_with_message("Done!");
+    } else {
+        pb.finish_with_message("Failed!");
         return Err("FFmpeg command failed".into());
     }
-
+    
     Ok(())
 }
 
