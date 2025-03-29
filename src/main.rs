@@ -298,13 +298,13 @@ fn process_file(
                     ]);
                 }
             }
-
-            stdCommand::new("mkvpropedit")
-                .args(&[video_path.to_str().unwrap_or(""), "--delete-attachment", "mime-type:image/jpeg"]);
-            stdCommand::new("mkvpropedit")
-                .args(&[video_path.to_str().unwrap_or(""), "--delete-attachment", "mime-type:image/png"]);
-            stdCommand::new("mkvpropedit")
-                .args(&[video_path.to_str().unwrap_or(""), "--tags", "all:"]);
+            //todo fix these commands not running ???
+            let _ = stdCommand::new("mkvpropedit")
+                .args(&[video_path.to_str().unwrap_or(""), "--delete-attachment", "mime-type:image/jpeg"]).output();
+            let _ = stdCommand::new("mkvpropedit")
+                .args(&[video_path.to_str().unwrap_or(""), "--delete-attachment", "mime-type:image/png"]).output();
+            let _ = stdCommand::new("mkvpropedit")
+                .args(&[video_path.to_str().unwrap_or(""), "--tags", "all:"]).output();
             let runthis = stdCommand::new("mkvpropedit").args(&mkvpropedit_args).output();
             match runthis {
                 Ok(_) => {
