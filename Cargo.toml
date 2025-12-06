@@ -1,17 +1,18 @@
 [package]
 name = "nfo2tags"
-version = "1.0.2"
+version = "1.0.3"
 edition = "2021"
 
 [dependencies]
-chrono = "0.4.39"
-clap = { version = "4.5.29", features = ["derive"] }
-env_logger = "0.11.6"
-image = "0.25.5"
-indicatif = "0.17.11"
-log = "0.4.25"
-serde = { version = "1.0.217", features = ["derive"] }
-serde-xml-rs = "0.6.0"
+chrono = "0.4.41"
+clap = { version = "4.5.41", features = ["derive"] }
+env_logger = "0.11.8"
+image = "0.25.6"
+indicatif = "0.18.0"
+log = "0.4.27"
+quick-xml = { version = "0.38.0", features = ["serialize"] }
+serde = { version = "1.0.219", features = ["derive"] }
+serde-xml-rs = "0.8.1"
 walkdir = "2.5.0"
 xml = "0.8.20"
 

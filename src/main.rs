@@ -1,7 +1,6 @@
 mod mkvxml;
 use log::{info, warn, error};
 use serde::Deserialize;
-use serde_xml_rs::from_str;
 use clap::{value_parser, Arg, Command};
 use std::ffi::OsString;
 use std::fs::{self, File, OpenOptions};
@@ -11,7 +10,7 @@ use std::process::Stdio;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 use image::{open, GenericImageView};
-use std::thread;
+use std::u64;
 use indicatif::{ProgressBar,ProgressStyle};
 use walkdir::WalkDir;
 use env_logger::{Builder, Target};
@@ -20,8 +19,9 @@ fn main() -> io::Result<()> {
     if let Err(e) = setup_logger() {
         eprintln!("Failed to setup logger: {}", e);
     }
+    info!(" ");
     info!("Starting NFO2tags application");
-
+    info!("_____________________________");
     let matches = Command::new("NFO2tags")
         .version("1.0.2")
         .author("William Moore <bmoore@tekgnosis.works>")
@@ -102,17 +102,18 @@ fn main() -> io::Result<()> {
             let path = entry.path();
             if let Some(ext)= path.extension().and_then(|e|e.to_str()){
                 if ext.eq_ignore_ascii_case("mp4") || ext.eq_ignore_ascii_case("mkv") {
+                    info!("Video: {}", path.file_name().unwrap().display());
                     let passnfo = nfo_path(path.to_path_buf(),None);
                     let passcover = cover_path(path.to_path_buf(),None,cover_suffix.to_string());
                     let passoutput = output_file_path(path.to_path_buf(),None);
                     match process_file(path, passnfo.as_ref().map(|p|p.as_path()), passcover.as_ref().map(|p|p.as_path()),passoutput.as_ref().map(|p|p.as_path()),deletefile ) {
                         Ok(_) => {
                             processed_count += 1;
-                            info!("Success: {}", path.display());
+                            info!("  Success: {}", path.file_name().unwrap().display());
                         }
                         Err(e) => {
                             error_count += 1;
-                            warn!("Error Processing: \n {} \n {}",path.display(),e);
+                            warn!("  Error Processing: {}", e);
                         }
                     }
                 }
@@ -126,11 +127,11 @@ fn main() -> io::Result<()> {
         let passoutput = output_file_path(video_path.to_path_buf(),matches.get_one("output"));
         match process_file(video_path, passnfo.as_ref().map(|p|p.as_path()), passcover.as_ref().map(|p|p.as_path()),passoutput.as_ref().map(|p|p.as_path()),deletefile ) {
             Ok(_) => {
-                info!("Success: {}", passoutput.unwrap().display());
+                info!("  Success: {}", passoutput.unwrap().display());
                 processed_count += 1;
             }
             Err(e) => {
-                warn!("Error Processing: \n {} \n {}",video_path.display(),e);
+                warn!("  Error Processing: {}",e);
             }
         }
     }
@@ -139,7 +140,7 @@ fn main() -> io::Result<()> {
     info!("Processing completed in {:?}", duration);
     info!("Files processed: {}", processed_count);
     if error_count > 0 {
-        warn!("Files with errors: {}", error_count);
+        warn!("  Files with errors: {}", error_count);
     }
 
     Ok(())
@@ -165,12 +166,11 @@ fn process_file(
             let mut nfo_file = File::open(nfo_file_path)?;
             let mut nfo_content = String::new();
             nfo_file.read_to_string(&mut nfo_content)?;
-            let nfo_data: Nfo = from_str(&nfo_content).map_err(|e| {
+            
+            let nfo_data: Nfo = quick_xml::de::from_str(&nfo_content).map_err(|e| {
                 Error::new(ErrorKind::InvalidData, format!("Failed to parse NFO: {}", e))
             })?;
-            genres = nfo_data.genre.iter().map(|g| g.value.as_str()).collect::<Vec<_>>().join(",");
-            tags = nfo_data.tags.iter().map(|t| t.value.as_str()).collect::<Vec<_>>().join(",");
-            nfo = Some(nfo_data);
+            nfo = Some(nfo_data)
         }
     } else {
         use_nfo = false;
@@ -208,21 +208,23 @@ fn process_file(
         .ok_or_else(|| Error::new(ErrorKind::InvalidInput, "Invalid file extension"))?;
 
     if !use_nfo && !use_cover {
-        warn!("Not Processing: Due to no NFO nor cover file: {}",video_path.display());
+        warn!("  Not Processing: Due to no NFO nor cover file: {}",video_path.display());
         return Err(Error::new(
             ErrorKind::NotFound,
             "NFO and Cover are missing or invalid."
         ));
     }
 
-    let nfo_data = nfo.ok_or_else(|| Error::new(ErrorKind::NotFound, "NFO data not available"))?;
-    
-    let title_metadata = format!("title={}", nfo_data.title);
+    let nfo_data: Nfo = nfo.ok_or_else(|| Error::new(ErrorKind::NotFound, "NFO data not available"))?;
+    genres = nfo_data.genre.iter().map(|g| g.as_str()).collect::<Vec<_>>().join(",");
+    tags = nfo_data.tags.iter().map(|t| t.as_str()).collect::<Vec<_>>().join(",");
+    let sanitize = |s: &str| s.replace('"', r#"\""#).replace('\n', " ").replace('\r', " ");
+    let title_metadata = format!("title={}", sanitize(&nfo_data.title));
     let genre_metadata = format!("genre={}", genres);
     let keywords_metadata = format!("keywords={}", tags);
-    let description_metadata = format!("description={}", nfo_data.plot);
-    let synopsis_metadata = format!("synopsis={}", nfo_data.outline);
-    let date_metadata = format!("date={}", nfo_data.premiered);
+    let description_metadata = format!("description={}", sanitize(&nfo_data.plot));
+    let synopsis_metadata = format!("synopsis={}", sanitize(&nfo_data.outline));
+    let date_metadata = format!("date={}", sanitize(&nfo_data.premiered));
     let mkv_xml_file = format!("all:{}", output_xml_path.to_str().unwrap_or(""));
     let mkv_cover = if is_landscape { "cover_land" } else { "cover" };
 
@@ -263,7 +265,6 @@ fn process_file(
             if let Some(output) = output_path {
                 ffmpeg_args.push(output.to_str().unwrap_or(""));
             }
-
             let didcomplete = run_ffmpeg_with_progress(&working_video_path.to_str().unwrap(), ffmpeg_args);
             match didcomplete {
                 Ok(_) => {
@@ -317,102 +318,132 @@ fn process_file(
         },
         _ => error!("{} Incorrect file type. It only works with MP4 and MKV files.", file_ext),
     }
-    info!("File is complete: {}", video_path.display());
     Ok(())
 }
 
 fn run_ffmpeg_with_progress(input_file: &str, mut video_args: Vec<&str>) -> Result<(), Box<dyn std::error::Error>> {
-    // Keep track of whether we're getting progress updates
-    let mut received_progress = false;
-    
-    // Get the duration before starting ffmpeg
-    let duration = {
-        let probe = stdCommand::new("ffprobe")
-            .args([
-                "-v", "quiet",
-                "-show_entries", "format=duration",
-                "-of", "default=noprint_wrappers=1:nokey=1",
-                input_file
-            ])
-            .output()?;
-        
-        String::from_utf8_lossy(&probe.stdout)
-            .trim()
-            .parse::<f64>()
-            .unwrap_or(0.0)
-    };
-
-    // Add progress output flag to FFmpeg
-    let input_index = video_args.iter().position(|&x| x == input_file).unwrap_or(0);
-    video_args.insert(input_index + 1, "-progress");
-    video_args.insert(input_index + 2, "pipe:1");
-    
     println!("Starting to process: {}", input_file);
-
-    let pb = ProgressBar::new(100);
+    
+    let video_duration: u64 = get_video_duration(&input_file)?;
+    println!("Video duration: {} seconds", video_duration);
+    
+    let pb = ProgressBar::new(video_duration);
     pb.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {percent}% ({eta})")?
+        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {percent}% ({eta}) {msg}")?
         .progress_chars("#>-"));
     
     pb.set_position(0);
+    pb.set_message("Processing...");
+    
+    let input_index = video_args.iter().position(|&x| x == input_file)
+        .ok_or("Input file not found in arguments")?;
+    
+    video_args.insert(input_index + 1, "-progress");
+    video_args.insert(input_index + 2, "pipe:1");
+    
+    video_args.insert(input_index + 3, "-nostats");
     
     let mut cmd = stdCommand::new("ffmpeg")
         .args(&video_args)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())  
+        .stderr(Stdio::null())  // Suppress stderr to avoid interference
         .spawn()?;
-    
-    let pb_clone = pb.clone();
-    let fake_updates = thread::spawn(move || {
-        for i in 1..100 {
-            thread::sleep(std::time::Duration::from_millis(100));
-            if !received_progress {
-                pb_clone.set_position(i);
-            } else {
-                break;
-            }
-        }
-    });
     
     if let Some(stdout) = cmd.stdout.take() {
         let reader = BufReader::new(stdout);
         
         for line in reader.lines() {
-            if let Ok(line) = line {
-                if line.starts_with("out_time=") {
-                    received_progress = true;  // We've received real progress
-                    
-                    let time_str = &line[9..];
-                    if let Ok(seconds) = parse_timestamp(time_str) {
-                        let percent = if duration > 0.0 {
-                            ((seconds / duration) * 100.0) as u64
-                        } else {
-                            0
-                        };
-                        
-                        pb.set_position(percent.min(100));
+            match line {
+                Ok(line) => {
+
+                    if line.contains('=') {
+                        let parts: Vec<&str> = line.splitn(2, '=').collect();
+                        if parts.len() == 2 {
+                            let key = parts[0].trim();
+                            let value = parts[1].trim();
+                            
+                            match key {
+                                "out_time_us" => {
+                                    if let Ok(current_us) = value.parse::<u64>() {
+                                        let current_secs = current_us / 1_000_000;
+                                        pb.set_position(current_secs.min(video_duration));
+                                    }
+                                }
+                                "out_time" => {
+                                    if let Ok(current_secs) = parse_time_to_seconds(value) {
+                                        pb.set_position((current_secs as u64).min(video_duration));
+                                    }
+                                }
+                                "progress" => {
+                                    if value == "end" {
+                                        pb.set_position(video_duration);
+                                        break;
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
                     }
                 }
+                Err(_) => break,
             }
         }
     }
     
-    // Wait for FFmpeg to complete
     let status = cmd.wait()?;
     
-    // Cancel our fake updates thread
-    fake_updates.join().unwrap_or(());
-    
-    // Always show 100% when done if successful
     if status.success() {
-        pb.set_position(100);
-        pb.finish_with_message("Done!");
+        pb.set_position(video_duration);
+        pb.finish_with_message("✅ Done!");
+        println!("Processing completed successfully!");
     } else {
-        pb.finish_with_message("Failed!");
+        pb.finish_with_message("❌ Failed!");
         return Err("FFmpeg command failed".into());
     }
     
     Ok(())
+}
+
+fn parse_time_to_seconds(time_str: &str) -> Result<f64, Box<dyn std::error::Error>> {
+    let parts: Vec<&str> = time_str.split(':').collect();
+    if parts.len() != 3 {
+        return Err("Invalid time format".into());
+    }
+    
+    let hours: f64 = parts[0].parse()?;
+    let minutes: f64 = parts[1].parse()?;
+    let seconds: f64 = parts[2].parse()?;
+    
+    Ok(hours * 3600.0 + minutes * 60.0 + seconds)
+}
+
+fn get_video_duration(input_path: &str) -> Result<u64, Box<dyn std::error::Error>> {
+    let output = stdCommand::new("ffprobe")
+        .args([
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            input_path,
+        ])
+        .stdout(Stdio::piped())
+        .spawn()?
+        .wait_with_output()?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "ffprobe failed with exit code: {}",
+            output.status
+        )
+        .into());
+    }
+    
+    let duration_str = String::from_utf8(output.stdout)?.trim().to_string();
+    let durationfloat: f64 = duration_str.parse()?;
+    let duration_secs: u64 = durationfloat.round() as u64;
+    Ok(duration_secs)
 }
 
 fn parse_timestamp(timestamp: &str) -> Result<f64, Box<dyn std::error::Error>> {
@@ -433,14 +464,14 @@ fn cover_path(mut path: PathBuf, cover_path: Option<&PathBuf>,suffix: String) ->
         Some(_)=> {
             let new_path_name: PathBuf = cover_path.unwrap().to_path_buf();
             if !is_correct_image(&new_path_name.extension().unwrap().to_str().unwrap()){
-                warn!("Incorrect type. Must be PNG, JPG, or JPEG");
+                warn!("  Incorrect type. Must be PNG, JPG, or JPEG");
                 return None
             }
             if !new_path_name.exists() {
-                warn!("Cover file does not exist: {}",new_path_name.display());
+                warn!("  Cover file does not exist: {}",new_path_name.display());
                 return None;
             }
-            info!("Found cover file: {}",new_path_name.display());
+            info!("  Found cover file: {}",new_path_name.display());
             return Some(new_path_name)
         }
         None => {
@@ -450,20 +481,20 @@ fn cover_path(mut path: PathBuf, cover_path: Option<&PathBuf>,suffix: String) ->
             cover_name.push(".jpg");
             path.set_file_name(cover_name);
             if path.exists() {
-                info!("Found cover file: {}", path.display());
+                info!("  Found cover file: {}", path.display());
                 return Some(path)
             }
             path.set_extension("jpeg");
             if path.exists() {
-                info!("Found cover file: {}", path.display());
+                info!("  Found cover file: {}", path.display());
                 return Some(path)
             }
             path.set_extension("png");
             if path.exists() {
-                info!("Found cover file: {}", path.display());
+                info!("  Found cover file: {}", path.display());
                 return Some(path)
             } else{
-                warn!("A cover file was not found.");
+                warn!("  A cover file was not found.");
                 return None
             }
         }
@@ -490,19 +521,19 @@ fn nfo_path(mut path: PathBuf, nfo_cli_option: Option<&PathBuf>) -> Option<PathB
         Some(_) => {
             let nfo_check = nfo_cli_option.unwrap().to_path_buf();
             if nfo_check.exists() {
-                info!("Found NFO file: {}", nfo_check.display());
+                info!("  Found NFO file: {}", nfo_check.display());
                 return Some(nfo_check)
             }
-            warn!("NFO file not found at {}", nfo_check.display());
+            warn!("  NFO file not found at {}", nfo_check.display());
             return None
         }
         None => {
             path.set_extension("nfo");
             if path.exists() {
-                info!("Found NFO file: {}", path.display());
+                info!("  Found NFO file: {}", path.display());
                 return Some(path);
             } else {
-                warn!("No NFO file found for video: {}", path.display());
+                warn!("  No NFO file found for video: {}", path.display());
                 return None;
             }
         }
@@ -524,7 +555,6 @@ fn setup_logger() -> Result<(), io::Error> {
 
     let multi_writer = MultiWriter::new(vec![
         Box::new(file),
-        Box::new(io::stderr()),
     ]);
 
     let mut builder = Builder::from_default_env();
@@ -601,21 +631,9 @@ struct Nfo {
     #[serde(default)]
     plot: String,
     #[serde(default)]
-    genre: Vec<Genre>,
+    genre: Vec<String>,
     #[serde(rename = "tag", default)]
-    tags: Vec<Tag>
-}
-
-#[derive(Debug, Deserialize)]
-struct Genre{
-    #[serde(rename = "$value")]
-    value: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct Tag{
-    #[serde(rename = "$value")]
-    value: String,
+    tags: Vec<String>
 }
 
 struct MultiWriter {
