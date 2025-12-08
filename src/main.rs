@@ -23,14 +23,14 @@ fn main() -> io::Result<()> {
     info!("Starting NFO2tags application");
     info!("_____________________________");
     let matches = Command::new("NFO2tags")
-        .version("1.0.3")
+        .version("1.0.4")
         .author("William Moore <bmoore@tekgnosis.works>")
         .about("Adds NFO information to the metadata in MP4 or MKV files.")
         .arg(
             Arg::new("video")
                 .short('v')
                 .long("video")
-                .value_name("File.mp4")
+                .value_name("File.mp4/.mkv")
                 .value_parser(value_parser!(PathBuf))
                 .help("Sets the input video file. Use parent folder for multiple files.")
                 .required(true),
@@ -63,9 +63,9 @@ fn main() -> io::Result<()> {
             Arg::new("output")
                 .short('o')
                 .long("output")
-                .value_name("FinishedFile.mp4")
+                .value_name("output/folder/address")
                 .value_parser(value_parser!(PathBuf))
-                .help("Sets mp4's output file, since the whole container must be rewritten to put in the tags. If missing, it just creats a backup of the file, File.OLD.mp4. ***Does not apply to MVK***"),
+                .help("Sets mp4's output folder. This is to accomedate the storage space issue, as the MP4 container must be recreated. ***Does not apply to MVK***"),
         )
         .arg(
             Arg::new("delete")
@@ -96,6 +96,14 @@ fn main() -> io::Result<()> {
     let mut processed_count = 0;
     let mut error_count = 0;
 
+    if let Some(outfolder) = matches.get_one::<PathBuf>("output") {
+        if !outfolder.is_dir() {
+            error!("Output flag must be a folder. Please try again.");
+            println!("Error: Output flag must be a folder. Please try again.");
+            std::process::exit(1);
+        }
+    }
+
     if video_path.is_dir() {
         info!("Processing directory: {}", video_path.display());
         for entry in WalkDir::new(video_path).into_iter().filter_map(|e|e.ok()){
@@ -105,7 +113,8 @@ fn main() -> io::Result<()> {
                     info!("Video: {}", path.file_name().unwrap().display());
                     let passnfo = nfo_path(path.to_path_buf(),None);
                     let passcover = cover_path(path.to_path_buf(),None,cover_suffix.to_string());
-                    let passoutput = output_file_path(path.to_path_buf(),None);
+                    let passoutput = output_file_path(path.to_path_buf(),matches.get_one("output"));
+
                     match process_file(path, passnfo.as_ref().map(|p|p.as_path()), passcover.as_ref().map(|p|p.as_path()),passoutput.as_ref().map(|p|p.as_path()),deletefile ) {
                         Ok(_) => {
                             processed_count += 1;
@@ -238,8 +247,11 @@ fn process_file(
                 let mut newpath: PathBuf = video_path.to_path_buf();
                 newpath.set_file_name(filename);
                 working_video_path = newpath;
+                fs::rename(&video_path, &working_video_path)?;
+            } else {
+                working_video_path = video_path.to_path_buf();
             }
-            fs::rename(&video_path, &working_video_path)?;
+            
             let mut ffmpeg_args = vec!["-nostats", "-loglevel", "0", "-i", working_video_path.to_str().unwrap_or("")];
             
             if use_cover {
@@ -262,9 +274,8 @@ fn process_file(
                 ffmpeg_args.extend_from_slice(&["-disposition:0", "attached_pic"]);
             }
 
-            if let Some(output) = output_path {
-                ffmpeg_args.push(output.to_str().unwrap_or(""));
-            }
+            ffmpeg_args.push(output_path.unwrap().to_str().unwrap());
+
             let didcomplete = run_ffmpeg_with_progress(&working_video_path.to_str().unwrap(), ffmpeg_args);
             match didcomplete {
                 Ok(_) => {
@@ -508,7 +519,10 @@ fn is_correct_image(image: &str) -> bool{
 fn output_file_path(path: PathBuf, output_file_path: Option<&PathBuf>) -> Option<PathBuf>{
     match output_file_path {
         Some(_) => {
-            return Some(output_file_path.unwrap().to_path_buf());
+            let filename = path.file_name();
+            let mut newoutput = output_file_path.unwrap().clone();
+            newoutput.set_file_name(filename.unwrap());
+            return Some(newoutput);
         }
         None => {
             return Some(path)
