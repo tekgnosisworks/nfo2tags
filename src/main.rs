@@ -23,7 +23,7 @@ fn main() -> io::Result<()> {
     info!("Starting NFO2tags application");
     info!("_____________________________");
     let matches = Command::new("NFO2tags")
-        .version("1.0.4")
+        .version("1.0.5")
         .author("William Moore <bmoore@tekgnosis.works>")
         .about("Adds NFO information to the metadata in MP4 or MKV files.")
         .arg(
@@ -236,6 +236,7 @@ fn process_file(
     let date_metadata = format!("date={}", sanitize(&nfo_data.premiered));
     let mkv_xml_file = format!("all:{}", output_xml_path.to_str().unwrap_or(""));
     let mkv_cover = if is_landscape { "cover_land" } else { "cover" };
+    let comments = "";
 
     match file_ext {
         "mp4" => {
@@ -258,7 +259,9 @@ fn process_file(
                 if let Some(cover) = cover_path {
                     ffmpeg_args.extend_from_slice(&["-i", cover.to_str().unwrap_or(""), "-map", "1", "-map", "0"]);
                 }
-            }
+            }else {
+                ffmpeg_args.extend_from_slice(&["-map", "0"]);
+            }       
 
             ffmpeg_args.extend_from_slice(&[
                 "-metadata", &title_metadata,
@@ -267,6 +270,7 @@ fn process_file(
                 "-metadata", &description_metadata,
                 "-metadata", &synopsis_metadata,
                 "-metadata", &date_metadata,
+                "-metadata", &comments,
                 "-codec", "copy",
             ]);
 
