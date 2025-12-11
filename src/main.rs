@@ -23,7 +23,7 @@ fn main() -> io::Result<()> {
     info!("Starting NFO2tags application");
     info!("_____________________________");
     let matches = Command::new("NFO2tags")
-        .version("1.0.6")
+        .version(env!("CARGO_PKG_VERSION"))
         .author("William Moore <bmoore@tekgnosis.works>")
         .about("Adds NFO information to the metadata in MP4 or MKV files.")
         .arg(
@@ -233,11 +233,17 @@ fn process_file(
     let keywords_metadata = format!("keywords={}", tags);
     let description_metadata = format!("description={}", sanitize(&nfo_data.plot));
     let synopsis_metadata = format!("synopsis={}", sanitize(&nfo_data.outline));
-    let date_metadata = format!("date={}", sanitize(&nfo_data.premiered));
+    let date_metadata = if !nfo_data.aired.is_empty() {
+            format!("date={}", sanitize(&nfo_data.aired))
+        } else {
+            format!("date={}", sanitize(&nfo_data.premiered))
+        };
+    let showtitle_metadata = format!("show={}", sanitize(&nfo_data.showtitle));
+    let season_metadata = format!("season_number={}", sanitize(&nfo_data.season));
+    let episode_metadata = format!("episode_id={}", sanitize(&nfo_data.episode));
     let mkv_xml_file = format!("all:{}", output_xml_path.to_str().unwrap_or(""));
     let mkv_cover = if is_landscape { "cover_land" } else { "cover" };
-    let comments = "";
-
+    
     match file_ext {
         "mp4" => {
             let mut working_video_path = PathBuf::new();
@@ -258,20 +264,25 @@ fn process_file(
             if use_cover {
                 if let Some(cover) = cover_path {
                     ffmpeg_args.extend_from_slice(&["-i", cover.to_str().unwrap_or(""), "-map", "1", "-map", "0"]);
+                } else {
+                    ffmpeg_args.extend_from_slice(&["-map", "0"]);
                 }
-            }else {
+            } else {
                 ffmpeg_args.extend_from_slice(&["-map", "0"]);
             }       
 
             ffmpeg_args.extend_from_slice(&[
+                "-map_metadata", "-1",
                 "-metadata", &title_metadata,
                 "-metadata", &genre_metadata,
                 "-metadata", &keywords_metadata,
                 "-metadata", &description_metadata,
                 "-metadata", &synopsis_metadata,
                 "-metadata", &date_metadata,
-                "-metadata", &comments,
-                "-codec", "copy",
+                "-metadata", &showtitle_metadata,
+                "-metadata", &season_metadata,
+                "-metadata", &episode_metadata,
+                "-c", "copy",
             ]);
 
             if use_cover {
@@ -279,7 +290,7 @@ fn process_file(
             }
 
             ffmpeg_args.push(output_path.unwrap().to_str().unwrap());
-
+            
             let didcomplete = run_ffmpeg_with_progress(&working_video_path.to_str().unwrap(), ffmpeg_args);
             match didcomplete {
                 Ok(_) => {
@@ -314,6 +325,7 @@ fn process_file(
                     ]);
                 }
             }
+            println!("Starting to process: {}", video_path.to_str().unwrap());
             //todo fix these commands not running ???
             let _ = stdCommand::new("mkvpropedit")
                 .args(&[video_path.to_str().unwrap_or(""), "--delete-attachment", "mime-type:image/jpeg"]).output();
@@ -324,9 +336,11 @@ fn process_file(
             let runthis = stdCommand::new("mkvpropedit").args(&mkvpropedit_args).output();
             match runthis {
                 Ok(_) => {
+                    println!("Processing completed successfully!");
                 },
                 Err(e) => {
-                    error!("mkvpropedit error: {}",e)
+                    error!("mkvpropedit error: {}",e);
+                    println!("Processing Failed!");
                 }
             }
             let _ = fs::remove_file(output_xml_path);
@@ -643,15 +657,55 @@ fn check_for_programs(program_name: &str) -> bool{
 struct Nfo {
     title: String,
     #[serde(default)]
+    showtitle: String,
+    #[serde(default)]
+    id: String,
+    #[serde(default)]
     premiered: String,
     #[serde(default)]
     outline: String,
     #[serde(default)]
     plot: String,
     #[serde(default)]
+    season: String,
+    #[serde(default)]
+    episode: String,
+    #[serde(default)]
+    aired: String,
+    #[serde(default)]
     genre: Vec<String>,
     #[serde(rename = "tag", default)]
-    tags: Vec<String>
+    tags: Vec<String>,
+    #[serde(rename = "uniqueid", default)]
+    unique_ids: Vec<UniqueId>,
+}
+#[derive(Debug, Deserialize)]
+struct UniqueId {
+    #[serde(rename = "@type")]
+    id_type: String,
+    #[serde(rename = "$value")]
+    value: String,
+}
+
+impl Nfo {
+    fn get_imdb_id(&self) -> Option<String> {
+        // First check if we have uniqueid elements (TV episode or newer format)
+        for unique_id in &self.unique_ids {
+            if unique_id.id_type == "imdb" {
+                return Some(unique_id.value.clone());
+            }
+        }
+
+        // Fallback to direct id field (older movie format)
+        if self.id.starts_with("tt") {
+            return Some(self.id.clone());
+        }
+        None
+    }
+
+    fn is_tv_episode(&self) -> bool {
+        !self.showtitle.is_empty() || !self.season.is_empty() || !self.episode.is_empty()
+    }
 }
 
 struct MultiWriter {
