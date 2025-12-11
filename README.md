@@ -8,9 +8,9 @@ This only works on MP4 and MKV containers.
 ## Tags
 These are limited by the standards and implementations of the containers.
 
-**MP4:** Title, Genre, Keywords, Description, Synopsis, Premiered(date)
+**MP4:** Title, Genre, Keywords, Description, Synopsis, Premiered(date); Episode tags: Show, Season, Episode 
 
-**MKV:** Actors, Directors, Credits, Description, Summary, Collection Name, Collection Overview, Plot, Outline, Overview, Tags, Genre, id (imdb), Title, OriginalTitle, Year, Tagline, Runtime, MPAA, Certification, tmdbid, Country, Premiered (date), Studio
+**MKV:** Actors, Directors, Credits, Description, Summary, Collection Name, Collection Overview, Plot, Outline, Overview, Tags, Genre, id (imdb), Title, OriginalTitle, Year, Tagline, Runtime, MPAA, Certification, tmdbid, Country, Premiered (date), Studio; Episode tags: Show, Season, Episode
 
 ## Arguments
 
